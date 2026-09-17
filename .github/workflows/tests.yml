@@ -32,10 +32,17 @@ jobs:
       - name: 编译检查
         run: python -m compileall -q src tools
 
+      # GitHub 的 runner 没有交互式桌面，Qt 默认的平台插件会直接崩掉
+      # （症状：测试脚本 1 秒内失败，连报告都来不及生成）。
+      # offscreen 让 Qt 渲染到内存，不依赖显示设备。
       - name: 自检测试
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: python tools/selftest.py
 
       - name: 端到端测试
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: python tools/e2e_test.py
 
       - name: 上传测试报告

@@ -936,9 +936,17 @@ def t_title_close_button_renders():
 
     pump(200)
 
-    def ink(widget) -> int:
-        """统计与左上角背景色不同的像素数量。"""
-        image = widget.grab().toImage().convertToFormat(QImage.Format.Format_ARGB32)
+    def ink(hover: bool) -> int:
+        """把按钮直接渲染进内存位图，数出与背景不同的像素。
+
+        用 `QWidget.render()` 而不是 `grab()`：render 直接调 paintEvent，
+        不依赖窗口系统是否真的显示了窗口、有没有派发鼠标事件。
+        离屏平台（CI 无人值守环境）下也稳定。
+        """
+        btn._hover = hover
+        image = QImage(btn.size(), QImage.Format.Format_ARGB32)
+        image.fill(0)
+        btn.render(image)
         base = image.pixelColor(1, 1).rgb()
         count = 0
         for y in range(image.height()):
@@ -947,13 +955,10 @@ def t_title_close_button_renders():
                     count += 1
         return count
 
-    normal = ink(btn)
+    normal = ink(False)
     assert normal > 12, "关闭图标几乎没画出像素（多半是字体缺字形）: {}".format(normal)
 
-    btn._hover = True
-    btn.update()
-    pump(150)
-    hovered = ink(btn)
+    hovered = ink(True)
     assert hovered > normal, "悬停时应有整块高亮背景: {} -> {}".format(normal, hovered)
 
     btn.close()
