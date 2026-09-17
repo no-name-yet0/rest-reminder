@@ -1,0 +1,49 @@
+name: 测试
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Windows · 自检 + 端到端
+    runs-on: windows-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install PySide6 pillow
+
+      - name: 生成程序图标
+        run: python tools/make_icon.py
+
+      - name: 编译检查
+        run: python -m compileall -q src tools
+
+      - name: 自检测试
+        run: python tools/selftest.py
+
+      - name: 端到端测试
+        run: python tools/e2e_test.py
+
+      - name: 上传测试报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            selftest-report.txt
+            e2e-report.txt
+          if-no-files-found: ignore

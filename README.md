@@ -1,5 +1,9 @@
 # 休息提醒 RestReminder
 
+[![测试](https://github.com/no-name-yet0/rest-reminder/actions/workflows/tests.yml/badge.svg)](https://github.com/no-name-yet0/rest-reminder/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB.svg)](https://www.python.org/)
+
 一个晚上提醒你「到点就停」的 Windows 小工具。目标是早睡，不是专注或番茄钟 ——
 时间到了会反复提醒，强度一路堆到你**真的离开电脑**为止，中途不给你「今天别再提醒」这种台阶下。
 
@@ -8,6 +12,17 @@
 - 绿色免安装：只有一个 exe，双击就能用
 - 不写注册表、不要管理员权限、不联网、无遥测
 - 已在 Windows 11 专业版 25H2 上验证
+
+---
+
+## 下载
+
+不用装 Python，直接下载单文件 exe（约 43 MB，双击即用）：
+
+**[⬇ 下载最新版 RestReminder.exe](https://github.com/no-name-yet0/rest-reminder/releases/latest)**
+
+> 首次运行 Windows 会提示「未知发布者」—— 这是所有未做代码签名的小工具的通病，
+> 点「更多信息 → 仍要运行」即可，不是报毒。
 
 ---
 
