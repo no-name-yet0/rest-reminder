@@ -1,0 +1,38 @@
+# ============================================================
+# 休息提醒 RestReminder  .gitignore
+# 原则：仓库里只放「手写的源码和文档」，不放任何生成物。
+# 下面这些每次运行/构建都会变，提交进去只会让 diff 变脏。
+# ============================================================
+
+# ---- 运行时生成 ----
+# 用户自己的配置（含个人作息、可选密码哈希），绝对不能进仓库
+config.json
+*.log
+
+# ---- 测试与诊断产物 ----
+_*.txt
+_backup_config/
+_backup_autostart/
+selftest-report.txt
+e2e-report.txt
+
+# ---- 构建产物 ----
+build/
+dist/
+*.manifest
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+*.swp
+*~
+Thumbs.db
+desktop.ini
