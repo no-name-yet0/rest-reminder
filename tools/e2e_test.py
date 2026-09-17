@@ -135,6 +135,14 @@ def main() -> int:
     cfg["after_rest"] = {"mode": "none", "grace_sec": 120}
     cfgmod.save(cfg)
 
+    # runner 这类无人值守的机器上，系统空闲时间可能是几十分钟甚至更久，
+    # 调度器会据此判定「用户已经离开」而直接结束今晚 —— 提醒根本不会触发。
+    # 把空闲时间钉成 0，模拟「人正坐在电脑前」。
+    from rreminder import winapi
+
+    original_idle = winapi.idle_seconds
+    winapi.idle_seconds = lambda: 0.0
+
     controller = None
     fired = []
     rested = []
@@ -173,15 +181,27 @@ def main() -> int:
             QTimer.singleShot(ms, loop.quit)
             loop.exec()
 
+        def wait_until(predicate, timeout_sec: float = 15.0, step_ms: int = 250) -> bool:
+            """轮询等待条件成立。
+
+            不要用「固定等 N 秒」：CI runner 负载高的时候 QTimer 会被推迟，
+            固定时长很容易刚好错过一次 tick —— 而本地跑一直是绿的。
+            """
+            deadline = datetime.now() + timedelta(seconds=timeout_sec)
+            while datetime.now() < deadline:
+                if predicate():
+                    return True
+                pump(step_ms)
+            return bool(predicate())
+
         # 第一次 tick 会先建立会话，此时会把 _next_fire 置空，必须先让它跑完
-        pump(1400)
-        assert controller.scheduler._session_rule_id == "e2e", "会话应当已建立"
+        assert wait_until(lambda: controller.scheduler._session_rule_id == "e2e"), (
+            "会话应当已建立"
+        )
 
         # 现在把下次触发时间设成"现在"，下一次 tick 就应当立刻命中
         controller.scheduler._next_fire = datetime.now()
-        pump(1800)
-
-        assert fired, "3.2 秒内应当至少触发一次提醒"
+        assert wait_until(lambda: bool(fired)), "15 秒内应当至少触发一次提醒"
         level, phase, overtime = fired[0]
         log(
             "PASS  提醒实际触发  -> 等级={} 阶段={} 超时={} 分钟".format(
@@ -218,8 +238,7 @@ def main() -> int:
 
         # 点「我去睡了」之后必须弹出可撤销的窗口，否则就是个摆设
         assert controller.rest_window is not None, "确认休息后应当弹出撤销窗口"
-        pump(700)
-        assert controller.rest_window.isVisible(), "撤销窗口应当可见"
+        assert wait_until(lambda: controller.rest_window.isVisible()), "撤销窗口应当可见"
         log(
             "PASS  撤销窗口  -> 已弹出，按钮文案「{}」".format(
                 controller.rest_window.cancel_btn.text()
@@ -247,8 +266,7 @@ def main() -> int:
         assert plan, "收尾模式应当给出节奏说明"
 
         controller.scheduler._next_fire = datetime.now()
-        pump(1600)
-        assert wind_fired, "收尾模式应当触发提醒"
+        assert wait_until(lambda: bool(wind_fired)), "收尾模式应当触发提醒"
         assert wind_fired[-1][1] is True, "收尾提醒的上下文必须标记 winddown"
         step = (controller.scheduler.status().get("winddown") or {}).get("step")
         log("PASS  收尾提醒触发  -> 等级={} 已推进 {} 格".format(wind_fired[-1][0], step))
@@ -274,9 +292,8 @@ def main() -> int:
         # 验证暂停/恢复：暂停后必须能立刻恢复
         controller.pause(60)
         assert controller.scheduler.status()["paused"] is True
-        pump(700)
         assert controller.pause_ui is not None, "暂停后应当弹出暂停提示窗"
-        assert controller.pause_ui.isVisible(), "暂停提示窗应当可见"
+        assert wait_until(lambda: controller.pause_ui.isVisible()), "暂停提示窗应当可见"
         assert "暂停" in controller.pause_ui.head.text(), controller.pause_ui.head.text()
         btn_text = controller.pause_ui.cancel_btn.text()
         assert "立即恢复" in btn_text, "暂停窗应当提供立即恢复，实际: {}".format(btn_text)
@@ -285,7 +302,7 @@ def main() -> int:
         # 点窗上的「立即恢复」应当真的恢复
         controller.pause_ui.cancel_btn.click()
         assert controller.scheduler.status()["paused"] is False, "点立即恢复后应当恢复"
-        assert not controller.pause_ui.isVisible(), "恢复后暂停窗应当关闭"
+        assert wait_until(lambda: not controller.pause_ui.isVisible()), "恢复后暂停窗应当关闭"
         log("PASS  立即恢复  -> 暂停状态已取消，窗口已关闭")
 
         # 从设置/托盘走恢复路径也要能关掉暂停窗
@@ -351,6 +368,10 @@ if __name__ == "__main__":
         LINES.append(traceback.format_exc())
         code = 1
     finally:
+        try:
+            winapi.idle_seconds = original_idle
+        except Exception:
+            pass
         # 不管发生什么，报告一定要落盘，否则失败了什么都看不到
         try:
             with open(REPORT, "w", encoding="utf-8") as fh:
