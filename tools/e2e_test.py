@@ -16,6 +16,14 @@ from datetime import datetime, timedelta
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 
+# Windows 上控制台默认走本地代码页（GitHub runner 上是 cp1252），
+# print 中文会抛 UnicodeEncodeError。统一改成 UTF-8 并对无法编码的字符降级替换。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 # 原生崩溃（段错误之类）不会走 Python 的异常与 finally，用 faulthandler 把崩溃栈
 # 落盘，否则什么都看不到。诊断文件放在系统临时目录 —— 不要写在项目根目录，
 # 否则每次跑测试都会留下 _boot.txt / _fault.txt 这类垃圾文件。
@@ -50,7 +58,15 @@ def _scrub(text: str) -> str:
 def log(text: str = "") -> None:
     """逐行落盘，这样即使进程原生崩溃也能看到最后走到哪一步。"""
     text = _scrub(text)
-    print(text)
+    try:
+        print(text)
+    except Exception:
+        # 控制台编码不支持中文时（GitHub runner 默认 cp1252）也不能崩 ——
+        # 落盘走的是 UTF-8，报告本身不受影响。
+        try:
+            print(text.encode("ascii", "replace").decode("ascii"))
+        except Exception:
+            pass
     LINES.append(text)
     try:
         mode = "w" if len(LINES) == 1 else "a"

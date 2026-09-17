@@ -16,6 +16,16 @@ from datetime import datetime, timedelta
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 
+# Windows 上控制台默认走本地代码页（GitHub runner 上是 cp1252），
+# print 中文会直接抛 UnicodeEncodeError，把测试脚本整个搞崩 ——
+# 而且崩在 print 里，报告文件都来不及写。
+# 统一把标准输出改成 UTF-8，并对无法编码的字符降级替换。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 REPORT = os.path.join(ROOT, "_selftest.txt")
 LINES = []
 
@@ -39,7 +49,15 @@ def _scrub(text: str) -> str:
 
 def log(text: str = "") -> None:
     text = _scrub(text)
-    print(text)
+    try:
+        print(text)
+    except Exception:
+        # 控制台编码不支持中文时（GitHub runner 默认 cp1252），退化成 ASCII 也要打出来。
+        # 「打印」这件事绝不能成为测试失败的原因 —— 报告文件本身写的是 UTF-8，不受影响。
+        try:
+            print(text.encode("ascii", "replace").decode("ascii"))
+        except Exception:
+            pass
     LINES.append(text)
 
 

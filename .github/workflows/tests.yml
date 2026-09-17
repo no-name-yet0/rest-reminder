@@ -12,6 +12,11 @@ jobs:
     name: Windows · 自检 + 端到端
     runs-on: windows-latest
 
+    # 双保险：脚本内部也会把 stdout 改成 UTF-8，这里再从环境层面兜一层
+    env:
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: "1"
+
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
